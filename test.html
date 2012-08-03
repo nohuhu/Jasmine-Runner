@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+  "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+  <title>Jasmine Spec Runner</title>
+  
+  <script type="text/javascript">
+    /*
+     * This variable holds URI part that is prepended to test spec name.
+     * Path to directory with test scripts, of a sort.
+     */
+    var __GLOBAL_TEST_URI_PREFIX__ = '/test/';
+  </script>
+
+  <link rel="shortcut icon" type="image/png" href="/test/jasmine-1.2.0/jasmine_favicon.png">
+  <link rel="stylesheet" type="text/css" href="/test/jasmine-1.2.0/jasmine.css">
+  <script type="text/javascript" src="/test/jasmine-1.2.0/jasmine.js"></script>
+  <script type="text/javascript" src="/test/jasmine-1.2.0/jasmine-html.js"></script>
+
+  <script type="text/javascript">
+    (function() {
+        var loc, spec_file, spec_url, spec_script;
+        
+        loc       = window.document.location;
+        spec_file = loc.search.replace(/^\?/, '').split('&').shift();
+    
+        if ( !spec_file ) {
+            alert('No spec file is provided. Use this runner with Jasmine spec: '+
+                  'test.html?path/to/jasmine/spec.js'
+            );
+            
+            return;
+        };
+        
+        // Monkey patching is so sexy
+        var origReporterView = jasmine.HtmlReporter.ReporterView,
+            origSuiteView    = jasmine.HtmlReporter.SuiteView,
+            origSpecView     = jasmine.HtmlReporter.SpecView;
+        
+        jasmine.HtmlReporter.ReporterView = function(dom) {
+            var me = new origReporterView(dom);
+            
+            me.origRefresh = me.refresh;
+            
+            me.refresh = function() {
+                me.origRefresh();
+                
+                this.runningAlert.href = '?' + spec_file;
+                this.skippedAlert.href = '?' + spec_file;
+                this.passedAlert.href  = '?' + spec_file;
+                this.failedAlert.href  = '?' + spec_file;
+            };
+            
+            return me;
+        };
+        
+        jasmine.HtmlReporter.SuiteView = function(suite, dom, views) {
+            var me = this,
+                createDom = jasmine.HtmlReporterHelpers.createDom;
+            
+            me.suite = suite;
+            me.dom = dom;
+            me.views = views;
+            
+            me.element = createDom('div', { className: 'suite' },
+                createDom('a', {
+                        className: 'description',
+                        href: '?' + spec_file + '&spec=' + encodeURIComponent(me.suite.getFullName())
+                    },
+                    me.suite.description
+                )
+            );
+            
+            me.appendToSummary(me.suite, me.element);
+        };
+        
+        jasmine.HtmlReporter.SuiteView.prototype = origSuiteView.prototype;
+        
+        jasmine.HtmlReporter.SpecView = function(spec, dom, views) {
+            var me = this,
+                createDom = jasmine.HtmlReporterHelpers.createDom;
+            
+            me.spec = spec;
+            me.dom = dom;
+            me.views = views;
+            
+            me.symbol = createDom('li', { className: 'pending' });
+            me.dom.symbolSummary.appendChild(me.symbol);
+            
+            me.summary = createDom('div', { className: 'specSummary' },
+                createDom('a', {
+                    className: 'description',
+                    href: '?' + spec_file + '&spec=' + encodeURIComponent(me.spec.getFullName()),
+                    title: me.spec.getFullName()
+                }, me.spec.description)
+            );
+            
+            me.detail = createDom('div', { className: 'specDetail' },
+                createDom('a', {
+                    className: 'description',
+                    href: '?' + spec_file + '&spec=' + encodeURIComponent(me.spec.getFullName()),
+                    title: me.spec.getFullName()
+                }, me.spec.getFullName())
+            );
+            
+            return this;
+        };
+        
+        jasmine.HtmlReporter.SpecView.prototype = origSpecView.prototype;
+        
+        spec_url = loc.protocol + '//' + loc.hostname + (loc.port !== '' ? ':' + loc.port : '') +
+                   __GLOBAL_TEST_URI_PREFIX__ + spec_file;
+        
+        function syncLoadScript(uri) {
+            var ajaxRequest;
+            
+            if ( window.XMLHttpRequest ) {
+                ajaxRequest = new XMLHttpRequest();
+            }
+            else {
+                ajaxRequest = new ActiveXObject('Microsoft.XMLHTTP');
+            };
+            
+            // Randomize URI so that content is always fresh
+            uri += (uri.match(/\?/) ? '&_dc=' : '?_dc=') + (new Date().getTime());
+            
+            ajaxRequest.open('GET', uri, false);
+            ajaxRequest.send();
+            
+            if ( ajaxRequest.status != '200' && ajaxRequest.status !== '304' ) {
+                throw { status: ajaxRequest.status, text: ajaxRequest.statusText };
+            };
+            
+            return ajaxRequest.responseText;
+        };
+        
+        function setTitle(title) {
+            document.title = title + ' - Jasmine Spec Runner';
+        };
+
+        function injectCss(uri) {
+            var node = document.createElement('link');
+            
+            node.type = 'text/css';
+            node.rel  = 'stylesheet';
+            node.href = uri;
+            
+            document.getElementsByTagName('head')[0].appendChild(node);
+        };
+    
+        function injectScript(uri) {
+            var node = document.createElement('script');
+            
+            node.type = 'text/javascript';
+            node.src  = uri;
+            
+            document.getElementsByTagName('head')[0].appendChild(node);
+        };
+        
+        /*
+         * Order in which scripts are injected and loaded matters,
+         * so we use synchronous loading to avoid the mess.
+         */
+        try {
+            spec_script = syncLoadScript(spec_url);
+        }
+        catch (e) {
+            alert('Server responded with ' + e.status + ' ' + e.text);
+            jasmine.__doNotRunTests = true;
+            
+            return;
+        };
+        
+        var match, lines, geval;
+        
+        lines = spec_script.split('\n');
+        geval = window.execScript || eval;
+        
+        for ( var i = 0, l = lines.length; i < l; i++ ) {
+            var line = lines[i];
+            
+            if ( match = line.match(/^\W*@title\s+(.*)$/) ) {
+                setTitle( match[1] );
+            };
+            
+            if ( match = line.match(/^\W*@css\s+([\S]+)$/) ) {
+                injectCss( match[1] );
+            };
+            
+            if ( match = line.match(/^\W*\@script\s+([\S]+)$/ ) ) {
+                var code = syncLoadScript( match[1] );
+                
+                geval(code + '\n//@ sourceURL=' + match[1]);
+            };
+        };
+        
+        // Finally, there goes the main script again
+        geval(spec_script + '\n//@ sourceURL=' + spec_file);
+
+        if ( jasmine.__doNotRunTests ) return;
+        
+        var jasmineEnv = jasmine.getEnv();
+        jasmineEnv.updateInterval = 1000;
+        
+        var htmlReporter = new jasmine.HtmlReporter();
+        
+        jasmineEnv.addReporter(htmlReporter);
+        
+        jasmineEnv.specFilter = function(spec) {
+            return htmlReporter.specFilter(spec);
+        };
+        
+        var currentWindowOnload = window.onload;
+        
+        window.onload = function() {
+            if (currentWindowOnload) {
+                currentWindowOnload();
+            }
+            execJasmine();
+        };
+        
+        function execJasmine() {
+            jasmineEnv.execute();
+        }
+    })();
+  </script>
+
+</head>
+
+<body>
+</body>
+</html>
